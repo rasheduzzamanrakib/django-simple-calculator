@@ -1,4 +1,4 @@
-# Simple Django Calculator
+# Simple Django Calculator - Developed with Zero Knowledge using CoPilot
 
 A simple web-based calculator built with Django that performs basic arithmetic operations.
 
