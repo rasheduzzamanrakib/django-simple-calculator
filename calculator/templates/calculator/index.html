@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Calculator</title>
+    {% csrf_token %}
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        
+        .calculator {
+            background-color: #333;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        .display {
+            width: 100%;
+            height: 60px;
+            font-size: 24px;
+            text-align: right;
+            padding: 0 10px;
+            margin-bottom: 10px;
+            border: none;
+            background-color: #000;
+            color: white;
+            border-radius: 5px;
+        }
+        
+        .buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+        
+        button {
+            height: 60px;
+            font-size: 18px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .number, .decimal {
+            background-color: #666;
+            color: white;
+        }
+        
+        .number:hover, .decimal:hover {
+            background-color: #777;
+        }
+        
+        .operator {
+            background-color: #ff9500;
+            color: white;
+        }
+        
+        .operator:hover {
+            background-color: #ffad33;
+        }
+        
+        .equals {
+            background-color: #ff9500;
+            color: white;
+        }
+        
+        .equals:hover {
+            background-color: #ffad33;
+        }
+        
+        .clear {
+            background-color: #a6a6a6;
+            color: black;
+        }
+        
+        .clear:hover {
+            background-color: #b8b8b8;
+        }
+        
+        .error {
+            color: red;
+            text-align: center;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="calculator">
+        <input type="text" class="display" id="display" readonly>
+        <div class="buttons">
+            <button class="clear" onclick="clearDisplay()">C</button>
+            <button class="clear" onclick="clearEntry()">CE</button>
+            <button class="operator" onclick="appendToDisplay('/')">/</button>
+            <button class="operator" onclick="appendToDisplay('*')">×</button>
+            
+            <button class="number" onclick="appendToDisplay('7')">7</button>
+            <button class="number" onclick="appendToDisplay('8')">8</button>
+            <button class="number" onclick="appendToDisplay('9')">9</button>
+            <button class="operator" onclick="appendToDisplay('-')">-</button>
+            
+            <button class="number" onclick="appendToDisplay('4')">4</button>
+            <button class="number" onclick="appendToDisplay('5')">5</button>
+            <button class="number" onclick="appendToDisplay('6')">6</button>
+            <button class="operator" onclick="appendToDisplay('+')">+</button>
+            
+            <button class="number" onclick="appendToDisplay('1')">1</button>
+            <button class="number" onclick="appendToDisplay('2')">2</button>
+            <button class="number" onclick="appendToDisplay('3')">3</button>
+            <button class="equals" onclick="calculate()" rowspan="2">=</button>
+            
+            <button class="number" onclick="appendToDisplay('0')" style="grid-column: span 2;">0</button>
+            <button class="decimal" onclick="appendToDisplay('.')">.</button>
+        </div>
+        <div id="error" class="error"></div>
+    </div>
+
+    <script>
+        let display = document.getElementById('display');
+        let errorDiv = document.getElementById('error');
+        
+        function appendToDisplay(value) {
+            if (value === '*') {
+                display.value += '*';
+            } else {
+                display.value += value;
+            }
+            clearError();
+        }
+        
+        function clearDisplay() {
+            display.value = '';
+            clearError();
+        }
+        
+        function clearEntry() {
+            display.value = display.value.slice(0, -1);
+            clearError();
+        }
+        
+        function clearError() {
+            errorDiv.textContent = '';
+        }
+        
+        async function calculate() {
+            if (!display.value) return;
+            
+            try {
+                const response = await fetch('/calculate/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        expression: display.value
+                    })
+                });
+                
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        throw new Error('Server endpoint not found. Make sure Django server is running.');
+                    } else if (response.status === 403) {
+                        throw new Error('CSRF error. Please refresh the page.');
+                    } else {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || `Server error: ${response.status}`);
+                    }
+                }
+                
+                const data = await response.json();
+                display.value = data.result;
+                clearError();
+                
+            } catch (error) {
+                console.error('Calculation error:', error);
+                errorDiv.textContent = error.message || 'Connection error. Please ensure Django server is running on http://127.0.0.1:8000';
+            }
+        }
+        
+        // Function to get CSRF token from cookies
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+        
+        // Add keyboard support
+        document.addEventListener('keydown', function(event) {
+            const key = event.key;
+            
+            if ('0123456789'.includes(key)) {
+                appendToDisplay(key);
+            } else if (['+', '-', '*', '/'].includes(key)) {
+                appendToDisplay(key);
+            } else if (key === '.') {
+                appendToDisplay('.');
+            } else if (key === 'Enter' || key === '=') {
+                event.preventDefault();
+                calculate();
+            } else if (key === 'Escape') {
+                clearDisplay();
+            } else if (key === 'Backspace') {
+                clearEntry();
+            }
+        });
+    </script>
+</body>
+</html>
